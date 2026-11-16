@@ -12,7 +12,7 @@ export function Logo({ className, showLabel = true, href = "/" }: LogoProps) {
   const content = (
     <>
       <Image
-        src="/logo.svg"
+        src="/logo.jpg"
         alt="Agent Builder"
         width={36}
         height={36}
