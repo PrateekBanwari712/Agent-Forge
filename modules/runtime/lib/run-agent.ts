@@ -1,86 +1,32 @@
-import { AgentDefinition } from "@/modules/agents/lib/definition";
-import { getToolsForAgent } from "@/modules/tools/lib/registry";
-import {
-  AIMessage,
-  BaseMessage,
-  HumanMessage,
-  SystemMessage,
-  ToolMessage,
-} from "@langchain/core/messages";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import type { BuilderDefinition } from "@/modules/workflows/lib/schema";
+import { compileWorkflow } from "./compile-workflow";
 
 export type RunEvent =
   | { type: "text_delta"; text: string }
   | { type: "tool_started"; tool: string; input: unknown }
-  | { type: "tool_completed"; tool: string; output: string }
-  | { type: "run_failed"; error: string };
+  | { type: "tool_completed"; tool: string; output: string };
 
 export async function runAgentStream(
-  definition: AgentDefinition,
+  definition: BuilderDefinition,
   history: { role: string; content: string }[],
   userMessage: string,
+  userId: string,
   onEvent: (event: RunEvent) => void,
 ) {
-  const tools = getToolsForAgent(definition);
-  const model = new ChatGoogleGenerativeAI({
-    model: definition.model.modelId,
-    apiKey: process.env.GEMINI_API_KEY,
-  });
+  const graph = compileWorkflow(definition, { userId, onEvent });
 
-  const modelWithTools = tools.length > 0 ? model.bindTools(tools) : model;
+  const result = await graph.invoke(
+    {
+      userMessage,
+      // Memory on = agent can see previous messages.
+      // Memory off = every message starts fresh.
+      history: definition.memory.enabled ? history : [],
+      output: "",
+      stepCount: 0,
+    },
+    // Stops automatically if it takes longer then he atent's time limit.
+    { signal: AbortSignal.timeout(definition.limits.timeoutMs) },
+  );
 
-  const messages: BaseMessage[] = [
-    new SystemMessage(definition.instructions),
-    ...history.map((m) =>
-      m.role === "user"
-        ? new HumanMessage(m.content)
-        : new AIMessage(m.content),
-    ),
-    new HumanMessage(userMessage),
-  ];
-
-  let toolcallcount = 0;
-  while (true) {
-    const response = await modelWithTools.invoke(messages);
-    messages.push(response);
-
-    const toolCalls = response.tool_calls ?? [];
-
-    if (toolCalls.length === 0) {
-      const text = String(response.content ?? "");
-      onEvent({ type: "text_delta", text });
-      return text;
-    }
-
-    for (const call of toolCalls) {
-      toolcallcount++;
-
-      if (toolcallcount > definition.limits.maxToolCalls) {
-        onEvent({ type: "run_failed", error: "Too many tool calls" });
-        return "";
-      }
-
-      onEvent({ type: "tool_started", tool: call.name, input: call.args });
-
-      const matchedTool = tools.find((t) => t.name === call.name);
-      let output = "Tool not found";
-
-      if (matchedTool) {
-        try {
-          output = String(await matchedTool.invoke(call.args));
-        } catch (err: any) {
-          output = err?.message ?? "Tool failed";
-        }
-      }
-
-      onEvent({ type: "tool_completed", tool: call.name, output });
-
-      messages.push(
-        new ToolMessage({
-          content: output,
-          tool_call_id: call.id ?? call.name,
-        }),
-      );
-    }
-  }
+  return result.output;
 }

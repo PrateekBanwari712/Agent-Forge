@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AppIcon } from "@/components/app-icon";
-import type { AgentDefinition } from "@/modules/agents/lib/definition";
 import { useSaveAgent } from "@/modules/agents/hooks/use-agents";
 import { AgentCanvas } from "@/modules/builder/components/agent-canvas";
 import { NodeSettingsPanel } from "@/modules/builder/components/node-settings-panel";
@@ -10,6 +9,7 @@ import { useCanvasStore } from "@/modules/builder/store/canvas-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast";
 import { ToolPicker } from "./tool-picker";
 import {
   Drawer,
@@ -35,7 +35,9 @@ type AgentBuilderProps = {
 
 export function AgentBuilder({ agent }: AgentBuilderProps) {
   const init = useCanvasStore((s) => s.init);
-  const isDirty = useCanvasStore((s) => s.isDirty);
+  const isCanvasDirty = useCanvasStore((s) => s.isDirty);
+  const settingsOpen = useCanvasStore((s) => s.settingsOpen);
+  const setSettingsOpen = useCanvasStore((s) => s.setSettingsOpen);
   const getDefinition = useCanvasStore((s) => s.getDefinition);
   const getCanvas = useCanvasStore((s) => s.getCanvas);
   const markClean = useCanvasStore((s) => s.markClean);
@@ -45,17 +47,31 @@ export function AgentBuilder({ agent }: AgentBuilderProps) {
   const [name, setName] = useState(agent.name);
   const [description, setDescription] = useState(agent.description);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
 
-  useEffect(() => {
-    init(agent.draftDefinition as AgentDefinition, agent.canvas as any);
-  }, [agent.id]);
+  const hasUnsavedChanges =
+    isCanvasDirty || name !== agent.name || description !== agent.description;
+
+  // Load this agent's saved graph into the canvas.
+  // We only re-run this when you open a different agent, not after every save,
+  // so your selection and open drawers don't reset.
 
   useEffect(() => {
-    setName(agent.name);
-    setDescription(agent.description);
-  }, [agent.name, agent.description]);
+    init(agent.draftDefinition, agent.canvas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps.
+  }, [agent.id]);
+
+  // Warn before closing the tab or refreshing with unsaved work.
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+    }
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   function handleSave() {
     saveAgent.mutate(
@@ -79,7 +95,8 @@ export function AgentBuilder({ agent }: AgentBuilderProps) {
               {name}
             </h1>
             <p className="text-muted-foreground text-xs">
-              Visual builder {isDirty ? "· unsaved changes" : "· saved"}
+              Visual builder{" "}
+              {hasUnsavedChanges ? "· unsaved changes" : "· saved"}
             </p>
           </div>
         </div>
@@ -107,7 +124,19 @@ export function AgentBuilder({ agent }: AgentBuilderProps) {
           </Button>
           <Button
             variant="outline"
-            render={<Link href="/agents" />}
+            render={
+              <Link
+                href="/agents"
+                onClick={(event) => {
+                  if (
+                    hasUnsavedChanges &&
+                    !window.confirm("You have unsaved changes. Leave anyway?")
+                  ) {
+                    event.preventDefault();
+                  }
+                }}
+              />
+            }
             nativeButton={false}
           >
             Back
@@ -119,8 +148,10 @@ export function AgentBuilder({ agent }: AgentBuilderProps) {
         <AgentCanvas />
       </main>
 
+      {/* Hide the tools drawer while settings are open (e.g. right after adding a custom tool). */}
+
       <Drawer
-        open={toolsOpen}
+        open={toolsOpen && !settingsOpen}
         onOpenChange={setToolsOpen}
         swipeDirection="left"
       >
@@ -149,7 +180,6 @@ export function AgentBuilder({ agent }: AgentBuilderProps) {
           <div className="min-h-0 flex-1 overflow-hidden">
             <ChatPanel
               agentId={agent.id}
-              definition={getDefinition()}
               welcomeMessage={agent.welcomeMessage}
               starterPrompts={(agent.starterPrompts as string[]) ?? []}
             />

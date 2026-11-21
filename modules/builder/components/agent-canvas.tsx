@@ -10,15 +10,13 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCanvasStore } from "../store/canvas-store";
 import { AgentNode } from "./nodes/agent-node";
-import { ModelNode } from "./nodes/model-node";
-import { ToolNode } from "./tool-node";
-import { MemoryNode } from "./nodes/memory-node";
+import { StartNode } from "./nodes/start-node";
+import { EndNode } from "./nodes/end-node";
 
 const nodeTypes: NodeTypes = {
   agent: AgentNode,
-  model: ModelNode,
-  tool: ToolNode,
-  memory: MemoryNode,
+  start: StartNode,
+  end: EndNode,
 };
 
 export function AgentCanvas() {

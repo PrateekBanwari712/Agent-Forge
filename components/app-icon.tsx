@@ -35,4 +35,12 @@ export function AppIcon({
       </span>
     );
   }
+
+  return (
+    <HugeiconsIcon
+      icon={icon}
+      strokeWidth={2}
+      className={cn("size-5 shrink-0", color, className)}
+    />
+  );
 }

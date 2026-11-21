@@ -1,16 +1,31 @@
 "use server";
 
+import type { Edge, Node } from "@xyflow/react";
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
 import { requireAuth } from "@/modules/auth/actions";
-import { defaultDefinition } from "../lib/definition";
+
 import { getTemplate } from "../lib/templates";
+import {
+  BuilderDefinition,
+  builderDefinitionSchema,
+  defaultBuilderDefinition,
+} from "@/modules/workflows/lib/schema";
+import { migrateV1ToV2 } from "@/modules/workflows/lib/migrate-v1";
+
+export type SaveAgentInput = {
+  name: string;
+  description: string;
+  draftDefinition: BuilderDefinition;
+  canvas: { nodes: Node[]; edges: Edge[] };
+};
 
 export async function listAgents() {
   const user = await requireAuth();
 
   return prisma.agent.findMany({
     where: {
-      userId: user.user.id!,
+      userId: user.user.id,
     },
     orderBy: {
       updatedAt: "desc",
@@ -24,7 +39,7 @@ export async function fetchAgent(agentId: string) {
   return prisma.agent.findFirst({
     where: {
       id: agentId,
-      userId: user.user.id!,
+      userId: user.user.id,
     },
   });
 }
@@ -36,7 +51,7 @@ export async function createBlankAgent() {
     data: {
       userId: user.user.id!,
       name: "Untitled Agent",
-      draftDefinition: defaultDefinition() as any,
+      draftDefinition: defaultBuilderDefinition() as Prisma.InputJsonValue,
     },
   });
 }
@@ -58,7 +73,10 @@ export async function createFromTemplate(templateId: string) {
       icon: template.icon,
       welcomeMessage: template.welcomeMessage,
       starterPrompts: template.starterPrompts,
-      draftDefinition: template.definition as any,
+      // Templates are written in the simple v1 format; we store them as a v2 graph.
+      draftDefinition: migrateV1ToV2(
+        template.definition,
+      ) as Prisma.InputJsonValue,
     },
   });
 }
@@ -74,49 +92,7 @@ export async function deleteAgent(agentId: string) {
   });
 }
 
-export async function UpdateAgent(
-  agentId: string,
-  data: {
-    name?: string;
-    description?: string;
-    instructions?: string;
-  },
-) {
-  const user = await requireAuth();
-
-  const agent = await prisma.agent.findFirst({
-    where: { id: agentId, userId: user.user.id! },
-  });
-
-  if (!agent) {
-    throw new Error("Agent not found");
-  }
-
-  const draftDefinition = agent.draftDefinition as ReturnType<
-    typeof defaultDefinition
-  >;
-
-  return prisma.agent.update({
-    where: { id: agentId },
-    data: {
-      name: data.name ?? agent.name,
-      description: data.description ?? agent.description,
-      draftDefinition: (data.instructions
-        ? { ...draftDefinition, instructions: data.instructions }
-        : draftDefinition) as any,
-    },
-  });
-}
-
-export async function saveAgent(
-  agentId: string,
-  data: {
-    name: string;
-    description: string;
-    draftDefinition: any;
-    canvas: any;
-  },
-) {
+export async function saveAgent(agentId: string, data: SaveAgentInput) {
   const user = await requireAuth();
   const agent = await prisma.agent.findFirst({
     where: {
@@ -129,13 +105,16 @@ export async function saveAgent(
     throw new Error("Agent not found");
   }
 
+  // Server actions can be called by anyone, so check the shape before saving.
+  const draftDefinition = builderDefinitionSchema.parse(data.draftDefinition);
+
   return prisma.agent.update({
     where: { id: agentId },
     data: {
       name: data.name,
       description: data.description,
-      draftDefinition: data.draftDefinition,
-      canvas: data.canvas,
+      draftDefinition: draftDefinition as Prisma.InputJsonValue,
+      canvas: data.canvas as unknown as Prisma.InputJsonValue,
     },
   });
 }
