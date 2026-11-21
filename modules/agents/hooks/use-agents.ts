@@ -9,9 +9,15 @@ import {
   fetchAgent,
   listAgents,
   saveAgent,
-  UpdateAgent,
+  type SaveAgentInput,
 } from "../actions";
 import { useRouter } from "next/navigation";
+import { toast } from "@/components/ui/toast";
+
+function showError(title: string) {
+  return (error: Error) =>
+    toast.add({ title, description: error.message, type: "error" });
+}
 
 export function useAgents() {
   return useQuery({
@@ -37,6 +43,7 @@ export function useCreateBlankAgent() {
       queryClient.invalidateQueries({ queryKey: agentKeys.list() });
       router.push(`/agents/${agent.id}/builder`);
     },
+    onError: showError("cound not create agent")
   });
 }
 
@@ -50,6 +57,7 @@ export function useCreateFromTemplate() {
       queryClient.invalidateQueries({ queryKey: agentKeys.list() });
       router.push(`/agents/${agent.id}/builder`);
     },
+    onError: showError("could not create agent")
   });
 }
 
@@ -60,23 +68,9 @@ export function useDeleteAgent() {
     mutationFn: deleteAgent,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: agentKeys.list() });
+      toast.add({ title: "Agent deleted", type: "success" });
     },
-  });
-}
-
-export function useUpdateAgent(agentId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: {
-      name?: string;
-      description?: string;
-      instructions?: string;
-    }) => UpdateAgent(agentId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: agentKeys.detail(agentId) });
-      queryClient.invalidateQueries({ queryKey: agentKeys.list() });
-    },
+    onError: showError("Could not delete agent"),
   });
 }
 

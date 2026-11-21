@@ -6,6 +6,9 @@ import { webSearchTool } from "./web-search";
 import { StructuredTool } from "@langchain/core/tools";
 import { isCustomToolConfig } from "@/modules/builder/lib/custom-tool";
 import { buildCustomTool } from "./custom-http";
+import { getGithubToken } from "./github/token";
+import { createGithubTools } from "./github";
+import { AgentNodeConfig } from "@/modules/workflows/lib/schema";
 
 const builtInTools: Record<string, StructuredTool> = {
   calculator: calculatorTool,
@@ -14,16 +17,39 @@ const builtInTools: Record<string, StructuredTool> = {
   read_webpage: readWebPageTool,
 };
 
-export function getToolsForAgent(definition: AgentDefinition) {
-  const tools: StructuredTool[] = [];
+const githubToolIds = [
+  "github_read_file",
+  "github_search_code",
+  "github_get_pr",
+  "github_get_diff",
+];
 
-  for (const t of definition.tools) {
+export async function getToolsForAgent(
+  config: AgentNodeConfig,
+  userId: string,
+) {
+  const tools: StructuredTool[] = [];
+  const needsGithub = config.tools.some((t) =>
+    githubToolIds.includes(t.toolId),
+  );
+
+  let githubTools: Record<string, StructuredTool> = {};
+  if (needsGithub) {
+    const token = await getGithubToken(userId);
+    githubTools = createGithubTools(token, {
+      owner: config.github?.owner,
+      repo: config.github?.repo,
+      defaultPrNumber: config.github?.defaultPrNumber,
+    });
+  }
+
+  for (const t of config.tools) {
     if (isCustomToolConfig(t.config)) {
       tools.push(buildCustomTool(t.config));
       continue;
     }
 
-    const builtIn = builtInTools[t.toolId];
+    const builtIn = builtInTools[t.toolId] ?? githubTools[t.toolId];
     if (builtIn) {
       tools.push(builtIn);
     }

@@ -88,7 +88,7 @@ export function defaultBuilderDefinition(
     ],
     edges: [
       { id: "e-start-agent", source: "start", target: "agent" },
-      { id: "e-start-end", source: "end", target: "end" },
+      { id: "e-agent-end", source: "agent", target: "end" },
     ],
     memory: { enabled: false },
     limits: { maxGraphSteps: 10, maxToolCalls: 5, timeoutMs: 60000 },

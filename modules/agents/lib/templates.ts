@@ -67,7 +67,7 @@ export const templates: AgentTemplate[] = [
         "You are an expert debugging assistant. Analyze error logs, trace back the source of issues, explain why they occur, and provide robust code fixes.",
       tools: [
         { toolId: "read_webpage", config: {} },
-        { toolId: "search_documentation", config: {} },
+        { toolId: "web_search", config: {} },
       ],
     },
   },
@@ -87,7 +87,7 @@ export const templates: AgentTemplate[] = [
       ...defaultDefinition(),
       instructions:
         "You are a technical writer assistant. Produce clear, comprehensive, and well-structured documentation, API guides, and code comments.",
-      tools: [{ toolId: "github_get_file", config: {} }],
+      tools: [{ toolId: "github_read_file", config: {} }],
     },
   },
   {

@@ -1,4 +1,4 @@
-export type CustomToolProgram = {
+export type CustomToolParam = {
   name: string;
   type: "string" | "number" | "boolean";
   description: string;
@@ -13,11 +13,11 @@ export type CustomToolConfig = {
   url: string;
   headers: { key: string; value: string }[];
   body: string;
-  parameters: CustomToolProgram[];
+  parameters: CustomToolParam[];
   timeoutMs: number;
 };
 
-export function defaultCustomToomConfig(): CustomToolConfig {
+export function defaultCustomToolConfig(): CustomToolConfig {
   return {
     type: "custom",
     name: "My Custom Tool",
@@ -36,6 +36,17 @@ export function defaultCustomToomConfig(): CustomToolConfig {
     ],
     timeoutMs: 10000,
   };
+}
+
+// converts My Weather Tool! to "my_weather_tool" for gemini
+export function toToolName(name: string) {
+  const cleaned = name
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9_-]+/g, "_")
+  .replace(/^_+|_+$/g,"");
+
+  return cleaned || "custom_tool";
 }
 
 export function isCustomToolConfig(

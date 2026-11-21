@@ -1,8 +1,10 @@
 import { Logo } from "@/components/logo";
+import { ModeToggle } from "@/components/ui/mode-toggle";
 import { requireAuth } from "@/modules/auth/actions";
 import { UserButton } from "@/modules/auth/components/UserButton";
 import Link from "next/link";
 
+export const instant = false;
 export default async function DashboardLayout({children}: {children: React.ReactNode}) {
     const user = await requireAuth();
 
@@ -26,8 +28,9 @@ export default async function DashboardLayout({children}: {children: React.React
             New Agent
           </Link>
         </nav>
-        <div className="mt-auto space-y-3 border-t border-border p-3">
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-border p-3">
           <UserButton user={user.user} />
+          <ModeToggle />
          
         </div>
       </aside>
