@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Logo } from "@/components/logo";
 import {
   Card,
@@ -8,8 +9,23 @@ import {
 } from "@/components/ui/card";
 import { requireUnauth } from "@/modules/auth/actions";
 import { SignInForm } from "@/modules/auth/components/sign-in-form";
+import { Spinner } from "@/components/ui/spinner";
 
-export default async function SignInPage() {
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-full flex-1 items-center justify-center p-4">
+          <Spinner className="size-6" />
+        </div>
+      }
+    >
+      <SignInContent />
+    </Suspense>
+  );
+}
+
+async function SignInContent() {
   await requireUnauth();
   return (
     <div className="flex min-h-full flex-1 items-center justify-center bg-background px-4 py-16">
